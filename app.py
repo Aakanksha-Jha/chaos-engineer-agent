@@ -2,7 +2,7 @@ import os
 import time
 import streamlit as st
 from openai import OpenAI
-from hindsight_client import Hindsight as Hindsight
+from hindsight_client import Hindsight
 
 # --- STREAMLIT UI CONFIGURATION ---
 st.set_page_config(page_title="Chaos Engineer Agent", page_icon="🛡️", layout="wide")
@@ -11,7 +11,6 @@ st.title("🛡️ Chaos Engineer: Incident Response Agent")
 st.caption("Powered by Hindsight Memory System & OpenRouter Model Routing")
 
 # --- INITIALIZATION & CREDENTIALS ---
-# Fallback to local streamlit secrets or environment inputs for judges testing it
 with st.sidebar:
     st.header("🔑 API Credentials")
     openrouter_key = st.text_input("OpenRouter API Key", type="password", value=os.getenv("OPENROUTER_API_KEY", ""))
@@ -32,17 +31,15 @@ if not openrouter_key or not hindsight_key:
 or_client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=openrouter_key
-)# Initialize the client by pointing to the Hindsight cloud layer
+)
+
+# Initialize the client by pointing to the Hindsight cloud layer
 hindsight = Hindsight(base_url="https://ui.hindsight.vectorize.io")
-# Assign your explicit key token string directly to the inner client headers
 hindsight.api_key = hindsight_key
-COLLECTION_NAME = "devops_incident_hindsight"
 
 # --- HELPER FUNCTIONS ---
 def init_store():
     try:
-        # Modern Hindsight automatically creates banks/collections dynamically on insertion!
-        # We will instantiate our dedicated DevOps bank here
         hindsight.create_bank(bank_id="devops_incident_hindsight", name="SRE Playbooks")
     except Exception:
         pass 
@@ -50,7 +47,6 @@ def init_store():
 def run_agent_loop(telemetry):
     memory_context = ""
     try:
-        # The new recall engine utilizes 4-way parallel search strategies 
         past_memories = hindsight.recall(bank_id="devops_incident_hindsight", query=telemetry)
         if past_memories:
             memory_context = "\n--- HINDSIGHT HISTORICAL OUTCOMES DETECTED ---\n"
@@ -61,7 +57,6 @@ def run_agent_loop(telemetry):
     except Exception:
         memory_context = "\n--- NO RELEVANT HINDSIGHT MEMORY RECORDED YET ---\n"
 
-    # 2. System Directives & Context Synthesis
     system_prompt = f"""You are an elite automated SRE Incident Response Agent.
 Standard Infrastructure Documentation dictates:
 - If Database CPU spikes occur, run 'execute_database_index_optimization' immediately.
@@ -71,7 +66,6 @@ CRITICAL: Review historical hindsight data if available below. If past memory in
 {memory_context}
 """
     
-    # 3. Model Inference via OpenRouter
     response = or_client.chat.completions.create(
         model=model_choice,
         messages=[
@@ -82,7 +76,7 @@ CRITICAL: Review historical hindsight data if available below. If past memory in
             {"type": "function", "function": {"name": "execute_database_index_optimization", "description": "Rebuilds indexes"}},
             {"type": "function", "function": {"name": "kill_rogue_cron_jobs", "description": "Terminates analytics leaks"}}
         ],
-        tool_choice="required"
+        tool_choice="auto"
     )
     
     tool_call = response.choices[0].message.tool_calls[0]
@@ -104,15 +98,14 @@ with col1:
         with st.spinner("Agent analyzing incident..."):
             action, memory_used = run_agent_loop(telemetry_signature)
             
-            st.text_area("Hindsight Retrieval Status:", value=memory_used, height=100, disabled=True)
+            st.text_area("Hindsight Retrieval Status:", value=memory_used, height=100, disabled=True, key="mem_col1")
             st.error(f"💥 Agent Selected Static Action: {action}")
             st.info("System Output: Rebuilding indexes did not resolve core thread constraints.")
             
-            # Commit failure step down into memory layer
-           hindsight.retain(
-    bank_id="devops_incident_hindsight",
-    content=f"Incident Signature: {telemetry_signature} -> Action attempted: {action} resulting in FAILURE. Post-Mortem insight: Index rebuild failed because root trigger was an un-throttled analytical backend cron task."
-)
+            hindsight.retain(
+                bank_id="devops_incident_hindsight",
+                content=f"Incident Signature: {telemetry_signature} -> Action attempted: {action} resulting in FAILURE. Post-Mortem insight: Index rebuild failed because root trigger was an un-throttled analytical backend cron task."
+            )
             st.success("📝 Post-Mortem insight permanently pushed into Hindsight Cloud!")
 
 with col2:
@@ -121,7 +114,7 @@ with col2:
         with st.spinner("Agent querying memory bank..."):
             action, memory_used = run_agent_loop(telemetry_signature)
             
-            st.text_area("Hindsight Retrieval Status:", value=memory_used, height=100, disabled=True)
+            st.text_area("Hindsight Retrieval Status:", value=memory_used, height=100, disabled=True, key="mem_col2")
             st.success(f"🛡️ Hindsight Adapted Action: {action}")
             st.info("System Output: Process terminated successfully. Background cron killed. CPU normalized to 12%.")
             st.balloons()
