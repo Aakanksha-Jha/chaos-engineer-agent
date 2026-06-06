@@ -2,7 +2,7 @@ import os
 import time
 import streamlit as st
 from openai import OpenAI
-from hindsight import HindsightClient
+from hindsight_client import Hindsight as HindsightClient
 
 # --- STREAMLIT UI CONFIGURATION ---
 st.set_page_config(page_title="Chaos Engineer Agent", page_icon="🛡️", layout="wide")
