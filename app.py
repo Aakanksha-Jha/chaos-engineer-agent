@@ -32,28 +32,30 @@ if not openrouter_key or not hindsight_key:
 or_client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=openrouter_key
-)
-hindsight = Hindsight(api_key=hindsight_key)
+)# Initialize the client by pointing to the Hindsight cloud layer
+hindsight = Hindsight(base_url="https://ui.hindsight.vectorize.io")
+# Assign your explicit key token string directly to the inner client headers
+hindsight.api_key = hindsight_key
 COLLECTION_NAME = "devops_incident_hindsight"
 
 # --- HELPER FUNCTIONS ---
 def init_store():
     try:
-        collections = hindsight.list_collections()
-        if COLLECTION_NAME not in [c.name for c in collections]:
-            hindsight.create_collection(name=COLLECTION_NAME, description="SRE post-mortem logs")
+        # Modern Hindsight automatically creates banks/collections dynamically on insertion!
+        # We will instantiate our dedicated DevOps bank here
+        hindsight.create_bank(bank_id="devops_incident_hindsight", name="SRE Playbooks")
     except Exception:
-        pass # Collection initialization handled idempotently
+        pass 
 
 def run_agent_loop(telemetry):
-    # 1. Look up episodic context in Hindsight Vector Layer
     memory_context = ""
     try:
-        past_memories = hindsight.search(collection_name=COLLECTION_NAME, query=telemetry, limit=2)
+        # The new recall engine utilizes 4-way parallel search strategies 
+        past_memories = hindsight.recall(bank_id="devops_incident_hindsight", query=telemetry)
         if past_memories:
             memory_context = "\n--- HINDSIGHT HISTORICAL OUTCOMES DETECTED ---\n"
-            for mem in past_memories:
-                memory_context += f"- [{mem.metadata.get('result')}] Attempted: {mem.metadata.get('action_taken')}. Post-Mortem Note: {mem.metadata.get('post_mortem')}\n"
+            for r in past_memories:
+                memory_context += f"- Memory Detected: {r.text}\n"
         else:
             memory_context = "\n--- NO RELEVANT HINDSIGHT MEMORY RECORDED YET ---\n"
     except Exception:
@@ -107,11 +109,10 @@ with col1:
             st.info("System Output: Rebuilding indexes did not resolve core thread constraints.")
             
             # Commit failure step down into memory layer
-            hindsight.insert_document(
-                collection_name=COLLECTION_NAME,
-                text=f"Incident Signature: {telemetry_signature}\nAction attempted: {action}\nOutcome status: FAILURE\nPost-Mortem insight: Index rebuild failed because root trigger was an un-throttled analytical backend cron task.",
-                metadata={"action_taken": action, "result": "FAILURE", "post_mortem": "Index rebuild failed due to analytical cron block leak."}
-            )
+           hindsight.retain(
+    bank_id="devops_incident_hindsight",
+    content=f"Incident Signature: {telemetry_signature} -> Action attempted: {action} resulting in FAILURE. Post-Mortem insight: Index rebuild failed because root trigger was an un-throttled analytical backend cron task."
+)
             st.success("📝 Post-Mortem insight permanently pushed into Hindsight Cloud!")
 
 with col2:
