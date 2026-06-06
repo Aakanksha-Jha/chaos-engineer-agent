@@ -2,7 +2,7 @@ import os
 import time
 import streamlit as st
 from openai import OpenAI
-from hindsight_client import Hindsight as HindsightClient
+from hindsight_client import Hindsight as Hindsight
 
 # --- STREAMLIT UI CONFIGURATION ---
 st.set_page_config(page_title="Chaos Engineer Agent", page_icon="🛡️", layout="wide")
@@ -33,7 +33,7 @@ or_client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=openrouter_key
 )
-hindsight = HindsightClient(api_key=hindsight_key)
+hindsight = Hindsight(api_key=hindsight_key)
 COLLECTION_NAME = "devops_incident_hindsight"
 
 # --- HELPER FUNCTIONS ---
